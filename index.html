@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Random Path</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            text-align: center;
+        }
+        #pathsContainer {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 20px auto;
+        }
+        .arrow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 120px;
+            height: 30px;
+            background-color: #4CAF50;
+            transform-origin: left center;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: background-color 0.3s;
+        }
+        .arrow::after {
+            content: '';
+            position: absolute;
+            right: -36px;
+            top: 0;
+            width: 0;
+            height: 0;
+            border-left: 30px solid #4CAF50;
+            border-top: 15px solid transparent;
+            border-bottom: 15px solid transparent;
+            transition: border-left-color 0.3s;
+        }
+        .arrow:hover {
+            background-color: #45a049;
+        }
+        .arrow:hover::after {
+            border-left-color: #45a049;
+        }
+        .arrow.locked {
+            cursor: default;
+        }
+        .arrow.locked:hover {
+            background-color: #4CAF50;
+        }
+        .arrow.locked:hover::after {
+            border-left-color: #4CAF50;
+        }
+        input, button {
+            margin: 10px;
+            padding: 10px 15px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #008CBA;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #007B9A;
+        }
+        #instructions {
+            margin-top: 20px;
+            font-style: italic;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>A Random Path</h1>
+        <input type="number" id="pathCount" min="2" max="8" value="2">
+        <button onclick="createPaths()">Create Paths</button>
+        <div id="pathsContainer"></div>
+        <div id="instructions" style="display: none;">Move arrows to the available paths</div>
+        <button onclick="choosePath()" id="chooseButton" style="display: none;">Choose Path</button>
+    </div>
+
+    <script>
+        let arrows = [];
+        let activeArrow = null;
+        let startAngle = 0;
+        let startRotation = 0;
+        let centerX, centerY;
+        let isLocked = false;
+
+        function createPaths() {
+            const pathCount = document.getElementById('pathCount').value;
+            const container = document.getElementById('pathsContainer');
+            container.innerHTML = '';
+            arrows = [];
+            isLocked = false;
+
+            for (let i = 0; i < pathCount; i++) {
+                const arrow = document.createElement('div');
+                arrow.className = 'arrow';
+                arrow.style.transform = `rotate(${i * (360 / pathCount)}deg)`;
+                container.appendChild(arrow);
+                arrows.push(arrow);
+
+                arrow.addEventListener('mousedown', startRotate);
+                arrow.addEventListener('touchstart', startRotate, { passive: false });
+            }
+
+            document.getElementById('chooseButton').style.display = 'inline-block';
+            document.getElementById('instructions').style.display = 'block';
+            document.getElementById('instructions').textContent = 'Move arrows to the available paths';
+        }
+
+        function startRotate(e) {
+            if (isLocked) return;
+            e.preventDefault();
+            activeArrow = this;
+            const rect = activeArrow.getBoundingClientRect();
+            centerX = rect.left + rect.width / 2;
+            centerY = rect.top + rect.height / 2;
+            
+            startAngle = getAngle(e);
+            startRotation = getRotationAngle(activeArrow);
+
+            document.addEventListener('mousemove', rotate);
+            document.addEventListener('touchmove', rotate, { passive: false });
+            document.addEventListener('mouseup', stopRotate);
+            document.addEventListener('touchend', stopRotate);
+        }
+
+        function getAngle(e) {
+            const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+            return Math.atan2(clientY - centerY, clientX - centerX) * 180 / Math.PI;
+        }
+
+        function rotate(e) {
+            if (activeArrow && !isLocked) {
+                e.preventDefault();
+                const currentAngle = getAngle(e);
+                let deltaAngle = currentAngle - startAngle;
+                
+                if (deltaAngle > 180) {
+                    deltaAngle -= 360;
+                } else if (deltaAngle < -180) {
+                    deltaAngle += 360;
+                }
+                
+                let newRotation = startRotation + deltaAngle;
+                newRotation = (newRotation + 360) % 360;
+                newRotation = Math.round(newRotation / 5) * 5;
+                
+                activeArrow.style.transform = `rotate(${newRotation}deg)`;
+            }
+        }
+
+        function stopRotate() {
+            activeArrow = null;
+            document.removeEventListener('mousemove', rotate);
+            document.removeEventListener('touchmove', rotate);
+            document.removeEventListener('mouseup', stopRotate);
+            document.removeEventListener('touchend', stopRotate);
+        }
+
+        function getRotationAngle(element) {
+            const transform = window.getComputedStyle(element).getPropertyValue('transform');
+            let angle = 0;
+            if (transform && transform !== 'none') {
+                const values = transform.split('(')[1].split(')')[0].split(',');
+                const a = values[0];
+                const b = values[1];
+                angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
+            }
+            return (angle + 360) % 360;
+        }
+
+        function choosePath() {
+            const randomIndex = Math.floor(Math.random() * arrows.length);
+            const chosenArrow = arrows[randomIndex];
+            
+            // Remove all arrows except the chosen one
+            arrows.forEach((arrow, index) => {
+                if (index !== randomIndex) {
+                    arrow.remove();
+                }
+            });
+
+            // Update the arrows array to only include the chosen arrow
+            arrows = [chosenArrow];
+
+            // Lock the chosen arrow
+            isLocked = true;
+            chosenArrow.classList.add('locked');
+
+            // Hide the "Choose Path" button
+            document.getElementById('chooseButton').style.display = 'none';
+
+            // Update instructions
+            document.getElementById('instructions').textContent = 'Path chosen!';
+
+        }
+    </script>
+</body>
+</html>
